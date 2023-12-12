@@ -20,6 +20,9 @@
       "~/*": [
         "./*"
       ],
+      "@react-query-firebase/*": [
+        "./lib/react-query-firebase/*"
+      ],
       "~shared/*": [
         "../functions/src/shared/*"
       ]

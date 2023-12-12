@@ -23,3 +23,8 @@ runGame({data: {id: '2', context: {players: ['a', 'b'], cardsPerPlayer:3}, event
 
 Note on persistance: xstate 5 has a whole other setup for it. https://stately.ai/docs/persistence. Which doesn't have the context or anything but generally seems to make stuff easier. TODO on update to xstate5 
 
+```
+npm run dev
+npm run emulate
+cd functions && npm run build:watch
+```
