@@ -1,4 +1,4 @@
-import React, { FormEventHandler, useRef, useState } from 'react';
+import React, { FormEventHandler, useEffect, useRef, useState } from 'react';
 import { Head } from '~/components/Head';
 import ToggleComponent from '~/components/toggle';
 import { useParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { useDatabaseSnapshot, useDatabaseSetMutation, useDatabaseValue } from "@
 
 import { useFunctionsCall } from '@react-query-firebase/functions'
 import cx from 'clsx';
+
 
 import { useFirestoreDocument } from "@react-query-firebase/firestore";
 import { doc, query, collection, limit, QuerySnapshot, DocumentData, Timestamp, DocumentReference } from "firebase/firestore";
@@ -54,29 +55,39 @@ const TabContent = ({ gameId, player, data }: { gameId: string, player: string, 
 
   const runGameFn = useFunctionsCall(functions, "runGame", {}, makeFnCallDebug(`runGame:${player}`));
 
-  const disableBtn = runGameFn.isLoading || runGameFn.isError
-
   const state = State.from(data.state)
-
-  const isPlaying = state.matches('round.playing')
   const playerData = playerDoc.data && playerDoc.data.data()
-  console.log('playerdoc', playerDoc, playerDoc.data?.exists(), playerDoc.data?.data(), playerData)
+
+  const isActivePlayer = data.players[data.context.currentPlayerIndex] === player;
+  const disableBtn = !isActivePlayer || runGameFn.isLoading || runGameFn.isError
+
+  const biddingPhase = state.matches('round.bidding')
+  const playingPhase = state.matches('round.playing')
+  const isPlaying = playingPhase && isActivePlayer;
 
   return (
     <div className='text-left'>
-      <div className='flex flex-row items-center justify-end mb-2'>
-        <MutationStatus name="playerdoc" mutation={playerDoc} />
-        <MutationStatus name="rungame" mutation={runGameFn} />
+      <div className='flex flex-row items-center justify-between mb-6'>
+        <h3 className='text-2xl font-bold flex-grow'> 
+          {biddingPhase && isActivePlayer && 'Bidding'}
+          {biddingPhase && !isActivePlayer && 'Waiting for bidders'}
+          {playingPhase && isActivePlayer && 'Playing'}
+          {playingPhase && !isActivePlayer && 'Waiting for players'}
+        </h3>
+        <div>
+          <MutationStatus name="playerdoc" mutation={playerDoc} />
+          <MutationStatus name="rungame" mutation={runGameFn} />
+        </div>
       </div>
-      
-      {state.matches('idle') && (
-        <button 
-          className='btn btn-block btn-lg btn-primary' 
+
+      {state.matches('idle') && isActivePlayer && (
+        <button
+          className='btn btn-block btn-lg mb-6 btn-primary'
           disabled={disableBtn}
           onClick={() => {
             runGameFn.mutate({
               id: gameId,
-              event: {type: 'START_GAME'}
+              event: { type: 'START_GAME' }
             })
           }}
         >Start Game</button>
@@ -84,43 +95,47 @@ const TabContent = ({ gameId, player, data }: { gameId: string, player: string, 
 
 
 
-        {!playerData && (
-          <span className="loading loading-spinner"></span>
-        )}
-
-        {playerData && playerData.hands && (
-          <>
-            <div 
-              className='flex flex-row items-center justify-center w-full flex-wrap rounded-md bg-slate-100 mb-4' 
-              style={{minHeight: '5rem'}} 
-            >
-              {playerData && playerData.hands.map((c) => (
-                <button key={`card-${c}`} className={cx('btn btn-lg mx-1', {
-                  'cursor-default btn-active': !isPlaying,
-                  'btn-neutral': c[0] === 'C' || c[0] === 'S',
-                  'btn-error': c[0] === 'D' || c[0] === 'H',
-                })}
-                  disabled={isPlaying && disableBtn}
-                  onClick={() => {
-                    isPlaying && runGameFn.mutate({
-                      id: gameId,
-                      event: { type: "PLAY_CARD", playerId: player, card: c }
-                    })
-                  }}
-                >{c}</button>
-              ))}
-            </div>
-          </>
-        )}
-
-
-      {isPlaying && (
-        <div>playing</div>
+      {!playerData && (
+        <span className="loading loading-spinner"></span>
       )}
 
-      {state.matches('round.bidding') && (
+      {playerData && playerData.hands && (
+        <>
+          <div
+            className={cx(
+              'flex flex-row items-center justify-center inner-shadow w-full flex-wrap rounded-md bg-slate-200 mb-4 px-8', {
+              'border border-green-400': isPlaying
+            }
+            )}
+            style={{ minHeight: '6.8rem' }}
+          >
+            {playerData && playerData.hands.map((card) => (
+              <button key={`card-${card}`} className={cx(
+                'flex justify-center items-center',
+                'rounded-btn h-20 w-16 p-4 mx-2 text-md font-bold',
+                {
+                  'cursor-default shadow-none': !isPlaying,
+                  'cursor-pointer shadow-md hover:brightness-90	': isPlaying,
+                  'bg-gray-800 text-white': card[0] === 'C',
+                  'bg-blue-950 text-white': card[0] === 'S',
+                  'bg-red-400': card[0] === 'D',
+                  'bg-pink-400': card[0] === 'H'
+                })}
+                disabled={isPlaying && disableBtn}
+                onClick={() => {
+                  isPlaying && runGameFn.mutate({
+                    id: gameId,
+                    event: { type: "PLAY_CARD", playerId: player, card }
+                  })
+                }}
+              >{card}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {biddingPhase && (
         <div>
-          <h3 className='text-2xl font-bold py-2'> Bidding </h3>
           <div className='flex flex-row flex-wrap items-center justify-center'>
 
             {Array.from({ length: data.context.cardsPerPlayer + 1 }, (_, bid) => (
@@ -158,15 +173,17 @@ function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
   return (
     <div className=' mt-10'>
       <h1 className='text-4xl font-bold pb-10'>Game found <span className="ml-4 badge badge-lg">{JSON.stringify(data.state)}</span></h1>
-      
-      
+
+
       <div className="indicator mb-12 w-full">
-        <span className={cx("indicator-item badge", {
-          'bg-slate-700 text-white': trumpCard[0] === 'C' || trumpCard[0] === 'S',
-          ' bg-red-400': trumpCard[0] === 'D' || trumpCard[0] === 'H',
-        } )}>
+        <span className={cx("indicator-item badge py-2", {
+          'bg-gray-800 text-white': trumpCard[0] === 'C',
+          'bg-blue-950 text-white': trumpCard[0] === 'S',
+          'bg-red-400': trumpCard[0] === 'D',
+          'bg-pink-400': trumpCard[0] === 'H'
+        })}>
           {trumpCard}
-        </span> 
+        </span>
         <div className="w-full grid grid-cols-4 gap-4 place-items-center bg-green-100 rounded-md p-8 ">
           {data.players.map(p => {
             const card = data.context.currentTrick[p]
@@ -174,12 +191,14 @@ function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
               <div key={`table-card-space-${p}`}
                 className={cx(
                   'rounded-md w-full py-4 px-8 min-h-64 bg-green-200 shadow-inner',
-                ' flex flex-col justify-end '
-              )} >
+                  ' flex flex-col justify-end '
+                )} >
                 {card && (
                   <div className={cx('rounded-lg flex justify-center items-center h-40 text-lg font-bold', {
-                    'bg-neutral text-white': card[0] === 'C' || card[0] === 'S',
-                    ' bg-red-400': card[0] === 'D' || card[0] === 'H',
+                    ' bg-gray-800 text-white': card[0] === 'C',
+                    'bg-blue-950 text-white': card[0] === 'S',
+                    ' bg-red-400': card[0] === 'D',
+                    'bg-pink-400': card[0] === 'H'
                   })}>
                     {card}
                   </div>
@@ -190,26 +209,25 @@ function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
           })}
         </div>
       </div>
-      
-      
+
+
       <div role="tablist" className="tabs tabs-lifted">
         {data.players.map(p => {
-          const tricksWon = data.context.trickWinners.filter(w => w===p).length
+          const tricksWon = data.context.trickWinners.filter(w => w === p).length
           const tricksBid = data.context.bids[p]
           return (
             <React.Fragment key={`tabFrag-${p}`}>
               <a key={`tab-${p}`} role="tab" className={cx(`tab indicator mr-4`, {
                 'tab-active': p === isPlayer,
-                'text-purple-800 underline': p === data.players[data.context.currentPlayerIndex]
-              })} aria-label={`Player ${p}`}  onClick={() => setPlayer(p)} >
-                  <span className='mx-2'>Player {p}</span>
-                  <span className={cx("indicator-item badge ", {
-                    'badge-success': tricksWon === tricksBid,
-                    'badge-error': tricksWon > tricksBid,
-                    // 'badge-primary': p !== data.players[data.context.currentPlayerIndex]
-                  })}>{tricksWon}/{tricksBid}</span>
+                'text-green-800 underline': p === data.players[data.context.currentPlayerIndex]
+              })} aria-label={`Player ${p}`} onClick={() => setPlayer(p)} >
+                <span className='mx-2'>Player {p}</span>
+                <span className={cx("indicator-item badge ", {
+                  'badge-success': tricksWon === tricksBid,
+                  'badge-error': tricksWon > tricksBid,
+                })}> {tricksBid !== undefined && `${tricksWon}/${tricksBid}`}</span>
               </a>
-              <div key={`tabcontent-${p}`}  role="tabpanel" className="tab-content bg-base-100 border-base-300 rounded-box p-6">
+              <div key={`tabcontent-${p}`} role="tabpanel" className="tab-content bg-base-100 border-base-300 rounded-box p-6">
                 {p === isPlayer && <TabContent gameId={gameId} player={p} data={data} />}
               </div>
             </React.Fragment>
@@ -218,11 +236,11 @@ function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
       </div>
 
       <div className="collapse  collapse-arrow mt-6 bg-base-200">
-        <input type="checkbox" className="peer" defaultChecked={true} /> 
+        <input type="checkbox" className="peer" defaultChecked={false} />
         <div className="collapse-title font-bold bg-slate-100 text-primary-content peer-checked:bg-slate-200">
           Game Context
         </div>
-        <div className="collapse-content  bg-slate-50 peer-checked:bg-slate-100 "> 
+        <div className="collapse-content  bg-slate-50 peer-checked:bg-slate-100 ">
           <pre><code>{JSON.stringify(data, null, 2)}</code></pre>
         </div>
       </div>
@@ -234,6 +252,14 @@ function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
 function Lobby({ gameId }) {
   const functions = useFunctions()
   const createGameMut = useFunctionsCall(functions, "createGame", {}, makeFnCallDebug('createGame'));
+  const [nPlayers, setNPlayers] = useState(2)
+  const [nCards, setNCards] = useState(2)
+
+  useEffect(() => {
+    if (nPlayers > nCards) {
+      setNCards(nPlayers)
+    }
+  }, [nPlayers, nCards])
 
   console.log(createGameMut)
 
@@ -243,14 +269,47 @@ function Lobby({ gameId }) {
         <MutationStatus name="createGameMut" mutation={createGameMut} />
       </h1>
       {createGameMut.isError && <pre className='text-red-800'>{JSON.stringify(createGameMut.error)}</pre>}
-      <button
-        className='btn btn-primary'
-        disabled={createGameMut.isLoading || createGameMut.isError}
-        onClick={() => createGameMut.mutate(
-          // undefined
-          { id: gameId, context: { players: ['a', 'b'], cardsPerPlayer: 7 } }
-        )}
-      > Create Game </button>
+      <div>
+        <div className='flex flex-row w-full items-center justify-center gap-6 text-right my-6'>
+          <label className="form-control max-w-xs w-24">
+            <div className="label">
+              <span className="label-text">Players</span>
+            </div>
+            <input type="number" 
+              className={cx("input input-bordered w-full max-w-xs")} 
+              value={nPlayers}
+              onChange={(e) => setNPlayers(e.target.valueAsNumber)}
+              />
+          </label>
+          <label className="form-control max-w-xs w-24">
+            <div className="label">
+              <span className="label-text">Rounds</span>
+            </div>
+            <input type="number" 
+              min={nPlayers}
+              className={cx("input input-bordered w-full max-w-xs")} 
+              value={nCards}
+              onChange={(e) => {
+                if (e.target.valueAsNumber >= nPlayers) setNCards(e.target.valueAsNumber);
+              }}
+              />
+          </label>
+        </div>
+        <button
+          className='btn btn-primary'
+          disabled={createGameMut.isLoading || createGameMut.isError}
+          onClick={() => createGameMut.mutate(
+            // undefined
+            { id: gameId, context: { 
+              players:  Array.from({ length: nPlayers }, (_, i) => String.fromCharCode(97 + i)),
+              cardsPerPlayer: nCards
+            } }
+          )}
+        > 
+          Create Game 
+        </button>
+      </div>
+     
     </div>
   )
 }
@@ -269,8 +328,7 @@ export function GameScreen() {
     <>
       <Head title="GamePage" />
       <nav className="navbar flex items-center justify-center">
-        <h2 className="text-lg">Game Instance:
-          <span className="ml-4 badge badge-accent badge-lg">{gameId}</span>
+        <h2 className="text-lg">Game Instance: {gameId}
           <MutationStatus name="gamedoc" mutation={gameDocument} />
         </h2>
       </nav>
@@ -287,7 +345,7 @@ export function GameScreen() {
         )}
 
 
-        <Smiley />
+        {/* <Smiley /> */}
       </main>
     </>
   );

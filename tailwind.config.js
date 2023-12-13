@@ -1,3 +1,4 @@
+const plugin = require('tailwindcss/plugin')
 
 module.exports = {
   mode: 'jit',
@@ -59,6 +60,16 @@ module.exports = {
   variants: {},
   plugins: [
     require('daisyui'),
+    // plugin(function extendDaisy({ addComponents, theme }) {
+    //   addComponents({
+    //     '.btn-inherit': {
+    //       backgroundColor: theme('colors.white'),
+    //       borderRadius: theme('borderRadius.lg'),
+    //       padding: theme('spacing.6'),
+    //       boxShadow: theme('boxShadow.xl'),
+    //     }
+    //   })
+    // })
   ],
   daisyui: {
     themes: [
