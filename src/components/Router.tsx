@@ -1,20 +1,30 @@
 import { Dialog } from '@headlessui/react';
-import { lazy, Suspense, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Outlet, RouteObject, useRoutes, BrowserRouter } from 'react-router-dom';
 
 const Loading = () => <p className="p-4 w-full h-full text-center">Loading...</p>;
 
-const IndexScreen = lazy(() => import('~/screens/Index'));
-const Page404Screen = lazy(() => import('~/screens/404'));
+import loadable from '@loadable/component'
+
+
+const IndexScreen = loadable(() => import('~/screens/Index'));
+const GameScreen = loadable(() => import('~/screens/Game'));
+const Page404Screen = loadable(() => import('~/screens/404'));
+
+// import IndexScreen from '~/screens/Index'
+// import GameScreen from '~/screens/Game'
+// import Page404Screen from '~/screens/404'
+
 
 function Layout() {
   return (
-    <div>
-      <nav className="p-4 flex items-center justify-between">
-        <span>Header</span>
-      </nav>
-      <Outlet />
-    </div>
+    <Outlet />
+    // <div>
+    //   <nav className="p-4 flex items-center justify-between">
+    //     <span>Header</span>
+    //   </nav>
+    //   <Outlet />
+    // </div>
   );
 }
 
@@ -35,6 +45,10 @@ const InnerRouter = () => {
         {
           index: true,
           element: <IndexScreen />,
+        },
+        {
+          path: '/game/:gameId?',
+          element: <GameScreen />
         },
         {
           path: '*',

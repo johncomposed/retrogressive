@@ -23,7 +23,10 @@ export const setupFirebase = () => {
     });
   } catch (error) {
     console.error({error})
+    return false;
   }
+
+  return firebaseApp;
 };
 
 let auth: Auth;
@@ -51,9 +54,7 @@ export const useFirestore = () => {
 };
 
 export const useFunctions = () => {
-  console.log('EMULATE?', useEmulator())
-
-  if (!firestore) {
+  if (!functions) {
     functions = getFunctions();
     if (useEmulator()) {
       connectFunctionsEmulator(functions, 'localhost', 5001);

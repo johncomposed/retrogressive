@@ -27,7 +27,7 @@ export const initGameContext = (ctx: Partial<GameContext> = {}): GameContext => 
     history: [],
     scores: {},
 
-    cardsPerPlayer: 0, // TODO: Don't love default init nonsense.
+    cardsPerPlayer: ctx.players?.length || 0, // TODO: Don't love default init nonsense.
     roundNumber: 0,
     currentPlayerIndex: 0,
 

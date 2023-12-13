@@ -109,7 +109,8 @@ export const updateRound = assign((context, event) => {
     // TODO: don't love this init here. But unclear if it should go in dealing or what.
     currentTrick: {},
     trickWinners: [],
-    leadSuit: null
+    leadSuit: null,
+    bids: {},
   };
 })
 

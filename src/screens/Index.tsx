@@ -4,6 +4,7 @@ import ToggleComponent from '~/components/toggle';
 import { useDatabase, useFunctions } from '~/lib/firebase';
 import { ref } from "firebase/database";
 import { useDatabaseSnapshot, useDatabaseSetMutation } from "@react-query-firebase/database";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { useFunctionsCall } from '@react-query-firebase/functions'
 import cx from 'clsx';
@@ -29,43 +30,25 @@ function MutationStatus({name="", mutation}: any) {
   })} />
 }
 
-function Smiley() {
-  const database = useDatabase()
+export function Smiley() {
   const functions = useFunctions()
-  // const mutationSmile = useFunctionsCall(functions, "smileyGenerator");
   const mutation = useFunctionsCall(functions, "helloWorld");
-  const dbRef = ref(database, `/smile/default/count`);
 
-  // const dbRef = ref(database, `/smile/default/count`);
-  const smiles = useDatabaseSnapshot(["smiles", "defau"], dbRef.parent!, {
-    subscribe: true,
-  });
-  const mutationSmile = useDatabaseSetMutation(dbRef);
-
-
-  const onSubmit:FormEventHandler<SmileyForm> = (e) => {
-    e.preventDefault();
-    mutationSmile.mutate(e.currentTarget.elements.amount.value)
-  }
-
-
+  console.log(mutation)
 
   // console.log(dbRef.parent)
  
   return (
     <div>
-    <button className="flex flex-row items-center" onClick={() => mutation.mutate(undefined)}><>Hello <MutationStatus name="hello" mutation={mutation}/> </> </button>
+    <button className="flex flex-row items-center" onClick={() => mutation.mutate(undefined)}>
+      <>
+    Hello <MutationStatus name="hello" mutation={mutation}/> 
+    </> </button>
 
     <div className='flex flex-row items-center'>
-      <MutationStatus name="smiles" mutation={smiles}/>
-      <h2>Smileys</h2> <MutationStatus name="smileMuta" mutation={mutationSmile}/>
-      <form onSubmit={onSubmit}><input disabled={mutationSmile.isLoading} name="amount" type="number" placeholder="how many?" /></form>
     </div>
     hi
-    {/* <pre>{JSON.stringify(smiles.data?.toJSON(), null, 2)}</pre> */}
-    {smiles.isLoading && 'loading'}
-    {smiles.data && JSON.stringify(smiles.data.val(), null, 2)}
-    {mutationSmile.isError && <pre>{mutationSmile.error.message}</pre>}
+
 
     </div>
   )
@@ -92,6 +75,8 @@ function Index() {
             </p>
             <Smiley />
             <ToggleComponent />
+            <ReactQueryDevtools position="bottom-right" panelPosition="right" />
+
           </div>
         </div>
       </div>
@@ -114,5 +99,59 @@ export default Index;
       console.log("Updating hello with variables?", variables);
     },
   });
+
+
+
+
+
+
+
+
+
+
+function Smiley() {
+  const database = useDatabase()
+  const functions = useFunctions()
+  // const mutationSmile = useFunctionsCall(functions, "smileyGenerator");
+  const mutation = useFunctionsCall(functions, "helloWorld");
+  const dbRef = ref(database, `/smile/default/count`);
+
+  // const dbRef = ref(database, `/smile/default/count`);
+  const smiles = useDatabaseSnapshot(["smiles", "defau"], dbRef.parent!, {
+    subscribe: true,
+  });
+  const mutationSmile = useDatabaseSetMutation(dbRef);
+
+
+  const onSubmit:FormEventHandler<SmileyForm> = (e) => {
+    e.preventDefault();
+    mutationSmile.mutate(e.currentTarget.elements.amount.value)
+  }
+
+
+  console.log(mutation)
+
+  // console.log(dbRef.parent)
+ 
+  return (
+    <div>
+    <button className="flex flex-row items-center" onClick={() => mutation.mutate(undefined)}><>Hello <MutationStatus name="hello" mutation={mutation}/> </> </button>
+
+    <div className='flex flex-row items-center'>
+      <MutationStatus name="smiles" mutation={smiles}/>
+      <h2>Smileys</h2> <MutationStatus name="smileMuta" mutation={mutationSmile}/>
+      <form onSubmit={onSubmit}><input disabled={mutationSmile.isLoading} name="amount" type="number" placeholder="how many?" /></form>
+    </div>
+    hi
+    {smiles.isLoading && 'loading'}
+    {smiles.data && JSON.stringify(smiles.data.val(), null, 2)}
+    {mutationSmile.isError && <pre>{mutationSmile.error.message}</pre>}
+
+    </div>
+  )
+
+
+}
+
 
  */
