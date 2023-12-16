@@ -1,9 +1,9 @@
 import React, { FormEventHandler, useEffect, useRef, useState } from 'react';
 import { Head } from '~/components/Head';
 import ToggleComponent from '~/components/toggle';
-import { useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 
-import { useDatabase, useFunctions, useFirestore } from '~/lib/firebase';
+import { useDatabase, useFunctions, useFirestore, useAuth } from '~/lib/firebase';
 import { ref } from "firebase/database";
 import { useDatabaseSnapshot, useDatabaseSetMutation, useDatabaseValue } from "@react-query-firebase/database";
 
@@ -18,18 +18,13 @@ import { Smiley } from './Index';
 import { MutationObserverResult, UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 import { GameDoc as _GameDoc, GamePlayerDoc as _GamePlayerDoc } from "~shared/index";
 import { State } from 'xstate/lib/State';
+import { MutationStatus, QueryStatus } from '~/components/ResultStatus';
+import { useAuthUser } from '~/lib/react-query-firebase/auth';
+
+
 type GameDoc = _GameDoc<Timestamp>
 type GamePlayerDoc = _GamePlayerDoc<Timestamp>
 
-function MutationStatus({ name = "", mutation, className = '' }: { name: string, className?: string, mutation: UseMutationResult | UseQueryResult }) {
-  return <div title={`${name} ${mutation.status}`} className={cx(`h-4 w-4 mx-2 inline-block rounded-full `, {
-    'bg-purple-600': mutation.status === 'idle',// mutation.isLoading || mutation.isIdle,
-    'bg-blue-600': mutation.isLoading,
-    'bg-green-600': mutation.isSuccess,
-    'bg-red-600': mutation.isError,
-    'bg-slate-500': mutation.isPaused
-  }, className)} />
-}
 
 const makeFnCallDebug = (name, moreOpts = {}) => ({
   onSuccess(...args) {
@@ -75,8 +70,8 @@ const TabContent = ({ gameId, player, data }: { gameId: string, player: string, 
           {playingPhase && !isActivePlayer && 'Waiting for players'}
         </h3>
         <div>
-          <MutationStatus name="playerdoc" mutation={playerDoc} />
-          <MutationStatus name="rungame" mutation={runGameFn} />
+          <QueryStatus name="playerdoc" res={playerDoc} />
+          <MutationStatus name="rungame" res={runGameFn} />
         </div>
       </div>
 
@@ -164,7 +159,7 @@ const TabContent = ({ gameId, player, data }: { gameId: string, player: string, 
 
 
 
-function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
+function ActiveGame({ gameId, playerId, data }: { gameId: string, playerId?: string, data: GameDoc }) {
   const [isPlayer, setPlayer] = useState(data.players[0])
 
   console.log('Game context', data)
@@ -210,30 +205,31 @@ function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
         </div>
       </div>
 
-
-      <div role="tablist" className="tabs tabs-lifted">
-        {data.players.map(p => {
-          const tricksWon = data.context.trickWinners.filter(w => w === p).length
-          const tricksBid = data.context.bids[p]
-          return (
-            <React.Fragment key={`tabFrag-${p}`}>
-              <a key={`tab-${p}`} role="tab" className={cx(`tab indicator mr-4`, {
-                'tab-active': p === isPlayer,
-                'text-green-800 underline': p === data.players[data.context.currentPlayerIndex]
-              })} aria-label={`Player ${p}`} onClick={() => setPlayer(p)} >
-                <span className='mx-2'>Player {p}</span>
-                <span className={cx("indicator-item badge ", {
-                  'badge-success': tricksWon === tricksBid,
-                  'badge-error': tricksWon > tricksBid,
-                })}> {tricksBid !== undefined && `${tricksWon}/${tricksBid}`}</span>
-              </a>
-              <div key={`tabcontent-${p}`} role="tabpanel" className="tab-content bg-base-100 border-base-300 rounded-box p-6">
-                {p === isPlayer && <TabContent gameId={gameId} player={p} data={data} />}
-              </div>
-            </React.Fragment>
-          )
-        })}
-      </div>
+      {!playerId && (
+        <div role="tablist" className="tabs tabs-lifted">
+          {data.players.map(p => {
+            const tricksWon = data.context.trickWinners.filter(w => w === p).length
+            const tricksBid = data.context.bids[p]
+            return (
+              <React.Fragment key={`tabFrag-${p}`}>
+                <a key={`tab-${p}`} role="tab" className={cx(`tab indicator mr-4`, {
+                  'tab-active': p === isPlayer,
+                  'text-green-800 underline': p === data.players[data.context.currentPlayerIndex]
+                })} aria-label={`Player ${p}`} onClick={() => setPlayer(p)} >
+                  <span className='mx-2'>Player {p}</span>
+                  <span className={cx("indicator-item badge ", {
+                    'badge-success': tricksWon === tricksBid,
+                    'badge-error': tricksWon > tricksBid,
+                  })}> {tricksBid !== undefined && `${tricksWon}/${tricksBid}`}</span>
+                </a>
+                <div key={`tabcontent-${p}`} role="tabpanel" className="tab-content bg-base-100 border-base-300 rounded-box p-6">
+                  {p === isPlayer && <TabContent gameId={gameId} player={p} data={data} />}
+                </div>
+              </React.Fragment>
+            )
+          })}
+        </div>
+      )}
 
       <div className="collapse  collapse-arrow mt-6 bg-base-200">
         <input type="checkbox" className="peer" defaultChecked={false} />
@@ -249,7 +245,7 @@ function ActiveGame({ gameId, data }: { gameId: string, data: GameDoc }) {
 }
 
 
-function Lobby({ gameId }) {
+function Lobby({ gameId, playerId="" }) {
   const functions = useFunctions()
   const createGameMut = useFunctionsCall(functions, "createGame", {}, makeFnCallDebug('createGame'));
   const [nPlayers, setNPlayers] = useState(2)
@@ -266,7 +262,7 @@ function Lobby({ gameId }) {
   return (
     <div className=' text-center mt-10'>
       <h1 className='text-4xl font-bold pb-4'>no game exists
-        <MutationStatus name="createGameMut" mutation={createGameMut} />
+        <MutationStatus name="createGameMut" res={createGameMut} />
       </h1>
       {createGameMut.isError && <pre className='text-red-800'>{JSON.stringify(createGameMut.error)}</pre>}
       <div>
@@ -316,7 +312,10 @@ function Lobby({ gameId }) {
 
 
 export function GameScreen() {
+  const location = useLocation()
   const { gameId = 'default' } = useParams();
+  const auth = useAuth()
+  const user = useAuthUser(['user'], auth)
   const firestore = useFirestore()
   const ref = doc(firestore, 'games', gameId) as DocumentReference<GameDoc>;
   const gameDocument = useFirestoreDocument(['games', gameId], ref, {
@@ -324,24 +323,31 @@ export function GameScreen() {
     subscribe: true
   })
 
+  const playerExists = user.isSuccess;
+  // const playerExists = user.isSuccess && user.data;
+
+
   return (
     <>
       <Head title="GamePage" />
       <nav className="navbar flex items-center justify-center">
         <h2 className="text-lg">Game Instance: {gameId}
-          <MutationStatus name="gamedoc" mutation={gameDocument} />
+          <QueryStatus name="gamedoc" res={gameDocument} />
+        </h2>
+        <h2 className='text-lg'>Player: {user.data?.uid || <Link to="/signin" state={{from: location}}>unknown. (signin?)</Link>}
+          <QueryStatus name="gamedoc" res={user} />
         </h2>
       </nav>
       <main className=' md:max-w-200 max-w-120 mx-auto px-4'>
         {gameDocument.isError && <pre className='text-red-800'>{JSON.stringify(gameDocument.error)}</pre>}
         {gameDocument.isLoading && <h1>Loading...</h1>}
 
-        {gameDocument.isSuccess && !gameDocument.data?.exists() && (
-          <Lobby gameId={gameId} />
+        {gameDocument.isSuccess && playerExists && !gameDocument.data?.exists() && (
+          <Lobby gameId={gameId} playerId={user.data?.uid}/>
         )}
 
-        {gameDocument.isSuccess && gameDocument.data?.exists() && (
-          <ActiveGame gameId={gameId} data={gameDocument.data.data()} />
+        {gameDocument.isSuccess && playerExists && gameDocument.data?.exists() && (
+          <ActiveGame gameId={gameId} playerId={user.data?.uid} data={gameDocument.data.data()} />
         )}
 
 

@@ -369,18 +369,16 @@ export function useAuthSignInAnonymously(
   auth: Auth,
   useMutationOptions?: UseMutationOptions<
     UserCredential,
-    AuthError,
-    { email: string; password: string }
+    AuthError
   >
 ): UseMutationResult<
   UserCredential,
-  AuthError,
-  { email: string; password: string }
+  AuthError, 
+  void
 > {
   return useMutation<
     UserCredential,
-    AuthError,
-    { email: string; password: string }
+    AuthError
   >(() => {
     return signInAnonymously(auth);
   }, useMutationOptions);

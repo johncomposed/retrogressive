@@ -14,7 +14,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "serve": "vite preview",
-    "emulate": "firebase emulators:start"
+    "emulate": "firebase emulators:start",
+    "emulate:demo": "firebase emulators:start --project demo-retrogressive-1"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.16",

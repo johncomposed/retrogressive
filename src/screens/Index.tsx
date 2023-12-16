@@ -10,6 +10,7 @@ import { useFunctionsCall } from '@react-query-firebase/functions'
 import cx from 'clsx';
 
 import {hello} from '~shared/hello'
+import { MutationStatus } from '~/components/ResultStatus';
 
 
 interface FormElements extends HTMLFormControlsCollection {
@@ -18,16 +19,6 @@ interface FormElements extends HTMLFormControlsCollection {
 
 interface SmileyForm extends HTMLFormElement {
  readonly elements: FormElements
-}
-
-function MutationStatus({name="", mutation}: any) {
-  return <div title={`${name} ${mutation.status}`} className={cx(`h-4 w-4 mx-2 rounded-full `, {
-    'bg-purple-600': mutation.isIdle,
-    'bg-blue-600': mutation.isLoading,
-    'bg-green-600': mutation.isSuccess,
-    'bg-red-600': mutation.isError,
-    'bg-slate-500': mutation.isPaused
-  })} />
 }
 
 export function Smiley() {
@@ -42,7 +33,7 @@ export function Smiley() {
     <div>
     <button className="flex flex-row items-center" onClick={() => mutation.mutate(undefined)}>
       <>
-    Hello <MutationStatus name="hello" mutation={mutation}/> 
+    Hello <MutationStatus name="hello" res={mutation}/> 
     </> </button>
 
     <div className='flex flex-row items-center'>
