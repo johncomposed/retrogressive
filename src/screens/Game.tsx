@@ -20,6 +20,7 @@ import { GameDoc as _GameDoc, GamePlayerDoc as _GamePlayerDoc } from "~shared/in
 import { State } from 'xstate/lib/State';
 import { MutationStatus, QueryStatus } from '~/components/ResultStatus';
 import { useAuthUser } from '~/lib/react-query-firebase/auth';
+import { setupPresenceHook } from '~/components/Presence';
 
 
 type GameDoc = _GameDoc<Timestamp>
@@ -154,11 +155,6 @@ const TabContent = ({ gameId, player, data }: { gameId: string, player: string, 
 }
 
 
-
-
-
-
-
 function ActiveGame({ gameId, playerId, data }: { gameId: string, playerId?: string, data: GameDoc }) {
   const [isPlayer, setPlayer] = useState(data.players[0])
 
@@ -251,6 +247,9 @@ function Lobby({ gameId, playerId="" }) {
   const [nPlayers, setNPlayers] = useState(2)
   const [nCards, setNCards] = useState(2)
 
+  const result = setupPresenceHook()
+
+
   useEffect(() => {
     if (nPlayers > nCards) {
       setNCards(nPlayers)
@@ -265,6 +264,16 @@ function Lobby({ gameId, playerId="" }) {
         <MutationStatus name="createGameMut" res={createGameMut} />
       </h1>
       {createGameMut.isError && <pre className='text-red-800'>{JSON.stringify(createGameMut.error)}</pre>}
+
+    <div>
+      <h1>presence</h1>
+
+    </div>
+
+
+
+
+
       <div>
         <div className='flex flex-row w-full items-center justify-center gap-6 text-right my-6'>
           <label className="form-control max-w-xs w-24">

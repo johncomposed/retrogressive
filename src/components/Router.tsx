@@ -7,6 +7,7 @@ const Loading = () => <p className="p-4 w-full h-full text-center">Loading...</p
 
 import loadable from '@loadable/component'
 import { useAuth } from '~/lib/firebase';
+import { setupPresenceHook } from '~/components/Presence';
 
 
 const IndexScreen = loadable(() => import('~/screens/Index'));
@@ -52,6 +53,10 @@ function SignoutRoute() {
   if (!outMut.isLoading && !user.isLoading && !user.data) return <Navigate to="/" />
   return <Loading />
 }
+
+
+
+
 
 
 
