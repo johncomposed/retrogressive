@@ -40,14 +40,13 @@ export function dealCards(deck: StrictCard[], cardsPerHand: number, playerIds: P
 export type isBidValidOpts = {
   roundNumber: number;
   cardsPerPlayer: number;
-  players: PlayerId[];
   bids: Record<PlayerId, number>; 
 }
-export function isBidValid(opts: isBidValidOpts, event: { playerId: PlayerId; bid: number }) {
-  const {roundNumber, cardsPerPlayer, players, bids} = opts;
+export function isBidValid(opts: isBidValidOpts, players: PlayerId[],  bid: number) {
+  const {roundNumber, cardsPerPlayer, bids} = opts;
 
   // Can't bid more than current cards per player
-  if (event.bid > cardsPerPlayer) return false;
+  if (bid > cardsPerPlayer) return false;
 
   // If the last person to bid is restricted.
   // Last bidder is unrestricted during the last round or once everyone has been last bidder once.
@@ -56,7 +55,7 @@ export function isBidValid(opts: isBidValidOpts, event: { playerId: PlayerId; bi
 
   if (restrictLastBidder && (players.length - bidArray.length) <= 1) {
     // Then the dealer can't bid an amount that makes it theoretically possible for everyone to make their bid.
-    return cardsPerPlayer !== (bidArray.reduce((b, acc) => b + acc, 0) + event.bid);
+    return cardsPerPlayer !== (bidArray.reduce((b, acc) => b + acc, 0) + bid);
   }
 
   return true;

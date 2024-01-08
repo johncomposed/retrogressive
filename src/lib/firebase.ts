@@ -23,11 +23,12 @@ export const setupFirebase = () => {
       appId: env.VITE_FIREBASE_APPID,
     }
 
-    firebaseApp = initializeApp(firebaseConfig.projectId.startsWith('demo-') ? 
-      Object.keys(firebaseConfig).reduce((prev, k) => {
-        prev[k] = k === 'projectId' ? firebaseConfig[k] : 'example_dummy_apikey';
-        return prev;
-      }, {}) : 
+    firebaseApp = initializeApp(
+      firebaseConfig.projectId.startsWith('demo-') ? 
+        Object.keys(firebaseConfig).reduce((prev, k) => {
+          prev[k] = k === 'projectId' ? firebaseConfig[k] : 'example_dummy_apikey';
+          return prev;
+        }, {}) : 
       firebaseConfig
     );
   } catch (error) {

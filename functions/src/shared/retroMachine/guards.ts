@@ -23,11 +23,13 @@ export const isValidBid = guard((context, event) => {
   if (event.playerId !== currentPlayerId) return false;
 
   return isBidValid({
-    roundNumber: context.roundNumber,
-    cardsPerPlayer: context.cardsPerPlayer,
-    players: context.players,
-    bids: context.bids
-  }, event);
+      roundNumber: context.roundNumber,
+      cardsPerPlayer: context.cardsPerPlayer,
+      bids: context.bids
+    },  
+    context.players,
+    event.bid
+  );
 })
 
 export const isBiddingComplete = guard((context) => {
