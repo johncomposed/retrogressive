@@ -14,7 +14,9 @@ import PlayerInGameRoute from './components/Routes/PlayerInGameRoute';
 export function Layout() {
   // When location state comes in with a message, display the message. 
   return (
-    <Outlet />
+    <div className='bg-core80s-50'>
+      <Outlet />
+    </div>
   );
 }
 
