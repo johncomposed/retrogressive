@@ -4,6 +4,7 @@ import { GameDoc } from '~shared/index';
 import { MutationStatus, QueryStatus } from '~/components/ResultStatus';
 import { State } from 'xstate';
 import { useGameAction, useSudoPlayerData } from '~/api/gameHooks';
+import Card from './Card';
 
 export type HandProps = {
   className?: ClassValue
@@ -59,29 +60,19 @@ export function Hand(props: HandProps) {
         <>
           <div
             className={cx(
-              'flex flex-row items-center justify-center inner-shadow w-full flex-wrap rounded-md bg-slate-200 mb-4 px-8', {
+              'flex flex-row items-center justify-center inner-shadow w-full flex-wrap rounded-md bg-slate-200 mb-4 px-8', 
+              'relative', {
               'border border-green-400': isPlaying
             }
             )}
-            style={{ minHeight: '6.8rem' }}
+            style={{ height: '20rem', minHeight: '20rem' }}
           >
-            {playerData && playerData.hands.map((card) => (
-              <button key={`card-${card}`} className={cx(
-                'flex justify-center items-center',
-                'rounded-btn h-20 w-16 p-4 mx-2 text-md font-bold',
-                {
-                  'cursor-default shadow-none': !isPlaying,
-                  'cursor-pointer shadow-md hover:brightness-90	': isPlaying,
-                  'bg-gray-800 text-white': card[0] === 'C',
-                  'bg-blue-950 text-white': card[0] === 'S',
-                  'bg-red-400': card[0] === 'D',
-                  'bg-pink-400': card[0] === 'H'
-                })}
-                disabled={isPlaying && disableBtn}
-                onClick={() => {
-                  isPlaying && playCard(card)
-                }}
-              >{card}</button>
+            {playerData && playerData.hands.map((card, i) => (
+              <Card key={`card-${card}`} card={card} 
+                    isPlaying={isPlaying} disableCard={isPlaying && disableBtn} 
+                    onClick={() => {isPlaying && playCard(card)}} 
+                    cardIndex={i} totalCards={playerData.hands.length}
+                />
             ))}
           </div>
         </>
@@ -90,7 +81,6 @@ export function Hand(props: HandProps) {
       {biddingPhase && (
         <div>
           <div className='flex flex-row flex-wrap items-center justify-center'>
-
             {Array.from({ length: data.context.cardsPerPlayer + 1 }, (_, bid) => (
               <button
                 key={`bid-${bid}`}

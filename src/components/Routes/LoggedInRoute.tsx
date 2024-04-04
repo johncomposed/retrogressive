@@ -9,9 +9,12 @@ export type LoggedInRouteProps = {
   navigateTo?: string
 };
 
+export const defaultLogProps = {
+  navigateTo: '/signin'
+}
 
 export default LoggedInRoute;
-export function LoggedInRoute({children}: LoggedInRouteProps) {
+export function LoggedInRoute({children, navigateTo}: LoggedInRouteProps = defaultLogProps) {
   const [user, {isLoggedIn}] = useUser()
   const location = useLocation(); // <-- get current location being accessed
 
@@ -22,11 +25,13 @@ export function LoggedInRoute({children}: LoggedInRouteProps) {
   if (user.isLoading) return <Loading />;
   if (isLoggedIn) return (
     <UserDataProvider loading={<Loading />} user={isLoggedIn.toJSON() as FirebaseUser} >
-      <Outlet />;
+      {children ?? <Outlet />}
     </UserDataProvider>
   );
 
-  return (
-    <Navigate to="/signin" state={{from: location }}  />
+  if (navigateTo) return (
+    <Navigate to={navigateTo} state={{from: location }}  />
   )
+
+  return <Loading />
 };

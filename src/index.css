@@ -33,3 +33,31 @@ code {
 input.brutal:focus {
   @apply border-2 border-solid border-b-2 border-r-2 border-black;
 }
+
+
+
+.card {
+  position: absolute;
+  border: 2px solid black;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.card span {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+} 
+
+.card {
+  --r: 1;
+  --x: 1;
+  --y: 1;
+}
+
+.card:hover {
+  --x: 1;
+  --y: -30;
+}
+
+

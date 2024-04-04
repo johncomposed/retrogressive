@@ -1,45 +1,24 @@
-# Retrogressive
+# Retrogressive (WIP)
+Retrogressive is a trick-taking card game developed by my great uncle Johnny similar to ["Oh Hell"](https://en.wikipedia.org/wiki/Oh_hell). This is a wip web version of it using [XSTATE](https://stately.ai/docs/xstate) and firebase. 
 
-# TODOS
-## General Flow
-- Should I make the state after a round wait for an event? 
-  - Maybe I could reuse a voting system for dealing the next hand. 
-  - Otherwise I have to figure out some way of making it a smoother transition to the next hand on the client.
+It is very much a work in progress.
 
-## Lobby
-- Edit machine to allow voting to start
+## In-progress screenshots
 
-## UI
-- Rough layout
-- Edge states
-- Animations
-- Tighter UI fixes
+|   |  | |
+| ------------- | ------------- | ----- |
+| ![Home page](/src/assets/april-home.png?raw=true "Home")  | ![Lobby page](/src/assets/april-lobby.png?raw=true "Lobby")  | ![Playing page](/src/assets/april-playing.png?raw=true "Playing") |
 
 
-
-
-
-## Motivation
-
-Improve building your faster **prototyping** by using Vite, TypeScript, React, TailwindCSS, Firebase.
-
-This starter uses following libraries:
-
-- Vite
-- React
-  - React Router
-- TypeScript
-- Tailwind CSS
-  - daisyUI
-- Firebase(v9, modular)
-- ESLint
 
 ## Set up
 
 ```shell
 mv .env.local.example .env.local
-yarn
-yarn dev
+npm run dev
+npm run emulate
+cd functions && npm run build:watch
+
 ```
 - copy Firebase env values from Firebase Console, and paste them to `.env.local`.
 - enable Google Auth in Firebase Console. ref: https://firebase.google.com/docs/auth/web/google-signin#before_you_begin

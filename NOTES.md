@@ -1,3 +1,26 @@
+## Todo
+
+## General Flow
+- Should I make the state after a round wait for an event? 
+  - Maybe I could reuse a voting system for dealing the next hand. 
+  - Otherwise I have to figure out some way of making it a smoother transition to the next hand on the client.
+
+## Lobby
+- Edit machine to allow voting to start
+
+## UI
+- Rough layout
+- Edge states
+- Animations
+- Tighter UI fixes
+
+
+
+
+
+
+
+
 Now that all the emulators are built I should run:
 
 `npm run build:watch` - Note the functions shell needs to reload to get the new built changes.
