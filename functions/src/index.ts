@@ -1,10 +1,11 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {initializeApp} from "firebase-admin/app"
 import {getFirestore, Timestamp, DocumentReference} from "firebase-admin/firestore"
+import { getAuth } from 'firebase-admin/auth';
 
 // import {getDatabase,} from "firebase-admin/database"
 // import * as logger from "firebase-functions/logger";
-// import * as functions from "firebase-functions";
+import * as functions from "firebase-functions";
 // import {onValueCreated} from "firebase-functions/v2/database"
 // import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import { Event } from "xstate";
@@ -18,7 +19,38 @@ import { gameMachine, GameContext, GameEvent, initGameContext, PlayerId } from "
 initializeApp();
 console.log('Shared directory still works:', hello())
 
+export const userCreated = functions.auth.user().onCreate((user) => {
+  const db = getFirestore();
+  // Add a new document in Firestore for the newly created user
+  return db.doc(`/users/${user.uid}`).set({
+    avatar: '👤',
+    displayName: user.displayName || 'Anonymous',
+    createdAt: new Date(), 
+  });
+});
 
+
+export const updateUserInAuth = functions.firestore.document('/users/{userId}').onUpdate(async (change, context) => {
+  const beforeData = change.before.data();
+  const afterData = change.after.data();
+  const auth = getAuth();
+  let success = true;
+  // Syncing the displayname and the user data. Just cause it feels bad to not do it.
+  if (beforeData.displayName !== afterData.displayName) {
+    try {
+      await auth.updateUser(context.params.userId, {
+        displayName: afterData.displayName,
+      });
+    } catch (error) {
+      console.error('Error updating user in Auth:', error);
+      success = false;
+      // TODO: What does this do? I don't know enough about firebase internals here.
+      // throw new functions.https.HttpsError('internal', 'Unable to update user displayName in Auth');
+    }
+  }
+
+  return success
+});
 
 
 type CreateGame = {
@@ -39,7 +71,8 @@ export const createGame = onCall<CreateGame>(async (req) => {
     throw new HttpsError('invalid-argument', 'Context needs players');
   }
 
-  const gameDocRef = getFirestore().collection(GAME_COLLECTION)
+  const gameDocRef = getFirestore()
+    .collection(GAME_COLLECTION)
     .doc(id) as DocumentReference<GameDoc>;
 
   const gameDoc = await gameDocRef.get();
@@ -81,8 +114,8 @@ type RunGame = {
 }
 
 // TODO: handle player auth ids
-export const runGame = onCall<RunGame>(async (stuff) => {
-  const {data: {id, event}} = stuff
+export const runGame = onCall<RunGame>(async (req) => {
+  const {data: {id, event}} = req;
   console.log('runGame', id, event)
 
   if (!id || !event) {
@@ -119,7 +152,6 @@ export const runGame = onCall<RunGame>(async (stuff) => {
     const stateChangeBatch = getFirestore().batch();
 
     // Check if hands changed. 
-    // TODO: There's a better way to do this.
     const newPlayerHands = Object.keys(hands);
     newPlayerHands.forEach(playerId => {
       if (hands[playerId]?.length !== context.hands[playerId]?.length) {
@@ -137,7 +169,6 @@ export const runGame = onCall<RunGame>(async (stuff) => {
     })
 
     await stateChangeBatch.commit();
-
     return { status: 'success', data: {changed: true, state: newState, context: newParsedContext}}
   }
 

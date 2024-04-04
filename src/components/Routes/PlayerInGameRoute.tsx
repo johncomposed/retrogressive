@@ -8,7 +8,9 @@ import { User } from 'firebase/auth';
 
 export function playerInGameIssue(gameId: string, user: User, gameData?: GameDoc) {
   if (!gameId || !gameData) return `Game ${gameId} not found`
-  if (!gameData.players.includes(user.uid)) return `${user.uid} is not a player in game ${gameId}`
+
+  // TODO: Once the user uid works then comment this out.
+  //if (!gameData.players.includes(user.uid)) return `${user.uid} is not a player in game ${gameId}`
   // `Game ${gameId} has already completed` // Actually it's fine if it's completed.
   return ""
 }
@@ -26,6 +28,7 @@ export function PlayerInGameRoute() {
   if (userReq.isLoading || gameReq.isLoading) return <Loading />;
   const issueMsg = playerInGameIssue(gameId!, user, gameReq.data,);
 
+  console.log('issue', issueMsg);
   if (!issueMsg) return <Outlet />;
   return (
     <Navigate to="/" state={{from: location, message: issueMsg }}  />

@@ -22,7 +22,7 @@ export type GamePlayerDoc = _GamePlayerDoc<Timestamp>
 
 
 export type LobbyPlayerVal = {
-  online?: boolean, 
+  online?: boolean,
   locked?: boolean
 }
 export type LobbyVal = {
@@ -33,64 +33,64 @@ export type LobbyVal = {
   players: Record<string, LobbyPlayerVal>
 }
 
+export const LOBBY_STRING = 'lobbies'
 export const lobbyPath = (lobbyId, key?: keyof LobbyVal, player?: string) => [
-  '/lobbies',
+  `/${LOBBY_STRING}`,
   lobbyId,
 ].concat(
-  player && key === 'players' ? [key, player] :
-  key ? [key] : []
-  ).join('/')
+  player && key === 'players' ?
+    [key, player] :
+    (key ? [key] : [])
+).join('/')
 
 
-
-// export const lobbyPlayers = (lobby: LobbyVal) => {
-//   // Note: fromEntries seems to merge same keys with the last one being written. So no need for set.
-//   return Object.fromEntries(
-//     lobby.connectedPlayers
-//       .concat(lobby.lockedInPlayers)
-//       .map(p => [p, lobby.lockedInPlayers.includes(p)])
-//   )
-// }
-
-export const useLobbyData = (lobbyId: string, subscribe=true) => {
+export const useLobbyData = (lobbyId: string, subscribe = true) => {
   const db = useDatabase()
   const lobbyRef = ref(db, lobbyPath(lobbyId));
-  const lobbyRes = useDatabaseValue<LobbyVal>(['lobbies', lobbyId], lobbyRef, {
+  const lobbyRes = useDatabaseValue<LobbyVal>([LOBBY_STRING, lobbyId], lobbyRef, {
     subscribe
   })
 
   return lobbyRes
 }
 
-
-
 export type LobbyActionTypes = 'join' | 'leave' | 'lock' | 'unlock'
 export const updateLobbyPlayer = (db: Database, lobbyId, playerId) => {
+  const lobbyRef = ref(db, lobbyPath(lobbyId));
   const lobbyPlayerRef = ref(db, lobbyPath(lobbyId, 'players', playerId));
 
   return async (type: LobbyActionTypes) => {
+    const lobbylatest = await get(lobbyRef);
+    const lobbyData: LobbyVal = lobbylatest.exists() ? lobbylatest.val() : {}
     const latest = await get(lobbyPlayerRef);
-    const data: LobbyPlayerVal = latest.exists() ? latest.val() : {online: false, locked: false}
+    const data: LobbyPlayerVal = latest.exists() ? latest.val() : { online: false, locked: false }
     const updateOrSet = latest.exists() ? update : set;
 
     if (type === 'lock') {
-      return updateOrSet(lobbyPlayerRef, {locked: true});
+      return updateOrSet(lobbyPlayerRef, { locked: true });
     }
 
     if (type === 'unlock') {
       if (!latest.exists()) return;
       if (!data.online) return remove(lobbyPlayerRef);
-      return updateOrSet(lobbyPlayerRef, {locked: false});
+      return updateOrSet(lobbyPlayerRef, { locked: false });
     }
 
     if (type === 'join') {
-      return updateOrSet(lobbyPlayerRef, {online: true});
+      if (!lobbyData.leader) await update(lobbyRef, {leader: playerId});
+      return updateOrSet(lobbyPlayerRef, { online: true });
     }
 
     if (type === 'leave') {
       if (!latest.exists()) return;
-      if (!data.locked) return remove(lobbyPlayerRef)
-      return updateOrSet(lobbyPlayerRef, {online: false});
+      if (!data.locked) {
+        if (lobbyData.leader === playerId) {
+          const newLeader = Object.keys(lobbyData.players??{}).filter(k => k !== playerId)[0];
+          await update(lobbyRef, {leader: newLeader??null});
+        }
+        return remove(lobbyPlayerRef)
+      }
+      return updateOrSet(lobbyPlayerRef, { online: false });
     }
 
     return;
@@ -117,19 +117,20 @@ export const useLobbyPlayerJoin = (lobbyId: string) => {
 
 
   useEffect(() => {
+    console.log('JOINED')
     lobbyMut.mutate('join');
     return () => {
+      console.log('LEFT')
       lobbyMut.mutate('leave')
     }
   }, [lobbyId])
-
 
   return lobbyMut
 }
 
 
 // todo: might be nicer to make it clear how to call the startgame.
-export const useStartGame = (lobbyId: string, debug=true) => {
+export const useStartGame = (lobbyId: string, debug = true) => {
   // const db = useDatabase()
   // const lobbyRef = ref(db, lobbyPath(lobbyId));
   const functions = useFunctions()

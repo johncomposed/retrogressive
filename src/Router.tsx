@@ -6,6 +6,9 @@ import GamePage from './screens/Game';
 import LobbyPage from './screens/Lobby';
 import SigninScreen from './screens/SignIn';
 
+import OldGamePage from './screens/OldGame';
+
+
 import LoggedInRoute from './components/Routes/LoggedInRoute';
 import PlayerInGameRoute from './components/Routes/PlayerInGameRoute';
 
@@ -25,6 +28,16 @@ export function Layout() {
 export const router = createBrowserRouter(createRoutesFromElements(
   <Route path="/" element={<Layout />}>
     <Route index element={<HomePage />}/>
+
+    {/* OLD ROUTES */}
+    <Route element={<LoggedInRoute />}>
+      <Route path="/old" element={<Navigate to="/" replace />}/>
+      <Route element={<PlayerInGameRoute />}>
+        <Route path="/old/:gameId" element={<OldGamePage />} />
+      </Route>
+      <Route path="/l/:gameId?" element={<OldGamePage />} />
+    </Route>
+
 
     <Route element={<LoggedInRoute />}>
       <Route path="/game" element={<Navigate to="/" replace />}/>

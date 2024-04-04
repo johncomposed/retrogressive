@@ -34,3 +34,15 @@ export const omit = <T extends object, K extends keyof T>(obj: T, ...keys: K[]):
 }
 
 
+
+// Just a copy of nanoid, a tiny non-secure uuid thing.
+let urlAlphabet = 'useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict'
+export const nanoid = (size = 21) => {
+  let id = ''
+  let i = size
+  while (i--) {
+    id += urlAlphabet[(Math.random() * 64) | 0]
+  }
+  return id;
+}
+  

@@ -16,6 +16,7 @@ import { useDatabaseSnapshot, useDatabaseSetMutation, useDatabaseValue } from "@
 import { useDatabase, useFunctions, useFirestore } from '~/lib/firebase';
 import { useLoggedInUser } from './userHooks';
 import { makeFnCallDebug } from './utils';
+import { QueryKey } from '@tanstack/react-query';
 
 export type GameDoc = _GameDoc<Timestamp>
 export type GamePlayerDoc = _GamePlayerDoc<Timestamp>
@@ -42,7 +43,7 @@ export const validBids = (gc: GameDoc) => {
 export const isActivePlayer = (gc: GameDoc, playerId) => gc.players[gc.context.currentPlayerIndex] === playerId;
 
 
-export const useGameData = (gameId: string, subscribe=true) => {
+export const useGameData = (gameId: string, subscribe = true) => {
   const firestore = useFirestore()
   const ref = doc(firestore, 'games', gameId) as DocumentReference<GameDoc>;
   const gameDocument = useFirestoreDocumentData(['games', gameId], ref, {
@@ -53,7 +54,19 @@ export const useGameData = (gameId: string, subscribe=true) => {
   return gameDocument
 }
 
-export const usePlayerData = (gameId: string, subscribe=true) => {
+export const useSudoPlayerData = (gameId: string, playerId: string, query: QueryKey = [], subscribe = true) => {
+  const firestore = useFirestore()
+  const playerDocRef = doc(firestore, 'games', gameId, 'players', playerId) as DocumentReference<GamePlayerDoc>;
+  const playerDoc = useFirestoreDocumentData((
+    ['games', gameId, playerId] as QueryKey).concat(query),
+    playerDocRef,
+    { subscribe }
+  )
+
+  return playerDoc
+}
+
+export const usePlayerData = (gameId: string, subscribe = true) => {
   const user = useLoggedInUser()
   const firestore = useFirestore()
   const playerDocRef = doc(firestore, 'games', gameId, 'players', user.uid) as DocumentReference<GamePlayerDoc>;
@@ -65,21 +78,21 @@ export const usePlayerData = (gameId: string, subscribe=true) => {
 }
 
 
-export const useGameAction = (gameId: string, debug=false) => {
+export const useGameAction = (gameId: string, playerId: string, debug = false) => {
   const functions = useFunctions()
   const runGameFn = useFunctionsCall(functions, "runGame", {}, debug ? makeFnCallDebug(`runGame`) : {});
 
   const startGame = useCallback(() => {
-    return runGameFn.mutate({id: gameId, event: { type: "START_GAME" }})
+    return runGameFn.mutate({ id: gameId, event: { type: "START_GAME", playerId } })
   }, [gameId])
 
 
   const playCard = useCallback((card: StrictCard) => {
-    return runGameFn.mutate({id: gameId, event: { type: "PLAY_CARD", card }})
+    return runGameFn.mutate({ id: gameId, event: { type: "PLAY_CARD", playerId, card } })
   }, [gameId])
 
   const makeBid = useCallback((bid: number) => {
-    return runGameFn.mutate({id: gameId, event: { type: "MAKE_BID", bid }})
+    return runGameFn.mutate({ id: gameId, event: { type: "MAKE_BID", playerId, bid } })
   }, [gameId])
 
   return [
@@ -94,11 +107,11 @@ export const useGameAction = (gameId: string, debug=false) => {
 
 // todo: STUB
 // https://firebase.google.com/docs/reference/js/v8/firebase.database.OnDisconnect
-export const usePlayerGamePresence = (gameId: string, setupDisconnect=false) => {
+export const usePlayerGamePresence = (gameId: string, setupDisconnect = false) => {
   const user = useLoggedInUser()
   const db = useDatabase()
   const onlineRef = ref(db, '.info/connected');
-  const online = useDatabaseValue(["isOnline"], onlineRef, {subscribe: true});
+  const online = useDatabaseValue(["isOnline"], onlineRef, { subscribe: true });
   const playerOnlineRef = ref(db, `/games/${gameId}/users/${user.uid}}`);
   const disconnectRef = useRef<OnDisconnect | null>(null);
 
@@ -126,7 +139,7 @@ export const usePlayerGamePresence = (gameId: string, setupDisconnect=false) => 
 export const useOpponentGamePresence = (gameId: string, playerId: string) => {
   const db = useDatabase()
   const onlineRef = ref(db, '.info/connected');
-  const online = useDatabaseValue(["isOnline"], onlineRef, {subscribe: true});
+  const online = useDatabaseValue(["isOnline"], onlineRef, { subscribe: true });
   return online
 }
 

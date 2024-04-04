@@ -21,6 +21,8 @@ import { State } from 'xstate/lib/State';
 import { MutationStatus, QueryStatus } from '~/components/ResultStatus';
 import { useAuthUser } from '~/lib/react-query-firebase/auth';
 import { setupPresenceHook } from '~/components/Presence';
+import { LobbyPlayerVal, useLobbyData, useLobbyPlayerJoin } from '~/api/lobbyHooks';
+import { useUserProfile } from '~/api/userHooks';
 
 
 type GameDoc = _GameDoc<Timestamp>
@@ -64,7 +66,7 @@ const TabContent = ({ gameId, player, data }: { gameId: string, player: string, 
   return (
     <div className='text-left'>
       <div className='flex flex-row items-center justify-between mb-6'>
-        <h3 className='text-2xl font-bold flex-grow'> 
+        <h3 className='text-2xl font-bold flex-grow'>
           {biddingPhase && isActivePlayer && 'Bidding'}
           {biddingPhase && !isActivePlayer && 'Waiting for bidders'}
           {playingPhase && isActivePlayer && 'Playing'}
@@ -240,14 +242,50 @@ function ActiveGame({ gameId, playerId, data }: { gameId: string, playerId?: str
   )
 }
 
+function UserProfileRow({ userId }: LobbyPlayerVal & {userId: string}) {
+  const { data, isLoading, status } = useUserProfile(userId)
 
-function Lobby({ gameId, playerId="" }) {
+  return (
+    <li className="py-3 sm:py-4">
+      <div className="flex items-center">
+        <div className="flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-green-300 flex items-center justify-center text-center">
+            {data?.avatar}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0 ms-4">
+          <p className="text-sm font-medium text-gray-900 truncate dark:text-white">
+            {isLoading ? <span className="loading loading-dots loading-xs"></span> : data?.displayName}
+          </p>
+          <p className="text-sm text-gray-500 truncate dark:text-gray-400">
+            {userId}
+          </p>
+        </div>
+        <div className="inline-flex items-center text-base font-semibold text-gray-900 dark:text-white">
+          <input type="checkbox" className="checkbox" />
+        </div>
+      </div>
+    </li>
+
+  )
+}
+
+
+function Lobby({ gameId, playerId = "" }) {
+  const lobbyData = useLobbyData(gameId)
+  const join = useLobbyPlayerJoin(gameId)
+
   const functions = useFunctions()
   const createGameMut = useFunctionsCall(functions, "createGame", {}, makeFnCallDebug('createGame'));
   const [nPlayers, setNPlayers] = useState(2)
   const [nCards, setNCards] = useState(2)
 
-  const result = setupPresenceHook()
+  // const result = setupPresenceHook()
+
+
+  useEffect(() => {
+    console.log('lobbydata!', lobbyData.data, lobbyData)
+  }, [lobbyData.status, lobbyData.dataUpdatedAt])
 
 
   useEffect(() => {
@@ -256,7 +294,7 @@ function Lobby({ gameId, playerId="" }) {
     }
   }, [nPlayers, nCards])
 
-  console.log(createGameMut)
+  // console.log(createGameMut)
 
   return (
     <div className=' text-center mt-10'>
@@ -265,10 +303,22 @@ function Lobby({ gameId, playerId="" }) {
       </h1>
       {createGameMut.isError && <pre className='text-red-800'>{JSON.stringify(createGameMut.error)}</pre>}
 
-    <div>
-      <h1>presence</h1>
-
-    </div>
+      <div>
+        <div className="w-full max-w-lg p-8 py-6  m-auto bg-white border border-gray-200 rounded-lg shadow">
+          <div className="flex items-center justify-between mb-4">
+            <h5 className="text-xl font-bold leading-none">
+              Players in Lobby
+            </h5>
+          </div>
+          <div className="flow-root">
+            <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700">
+              {lobbyData.data?.players && Object.entries(lobbyData.data.players).map(([playerId, playerStatus]) => {
+                return <UserProfileRow key={playerId} userId={playerId} {...playerStatus} />
+              })}
+            </ul>
+          </div>
+        </div>
+      </div>
 
 
 
@@ -280,41 +330,42 @@ function Lobby({ gameId, playerId="" }) {
             <div className="label">
               <span className="label-text">Players</span>
             </div>
-            <input type="number" 
-              className={cx("input input-bordered w-full max-w-xs")} 
+            <input type="number"
+              className={cx("input input-bordered w-full max-w-xs")}
               value={nPlayers}
               onChange={(e) => setNPlayers(e.target.valueAsNumber)}
-              />
+            />
           </label>
           <label className="form-control max-w-xs w-24">
             <div className="label">
               <span className="label-text">Rounds</span>
             </div>
-            <input type="number" 
+            <input type="number"
               min={nPlayers}
-              className={cx("input input-bordered w-full max-w-xs")} 
+              className={cx("input input-bordered w-full max-w-xs")}
               value={nCards}
               onChange={(e) => {
                 if (e.target.valueAsNumber >= nPlayers) setNCards(e.target.valueAsNumber);
               }}
-              />
+            />
           </label>
         </div>
         <button
           className='btn btn-primary'
-          disabled={createGameMut.isLoading || createGameMut.isError}
+          disabled={createGameMut.isLoading || createGameMut.isError || !lobbyData.data?.players}
           onClick={() => createGameMut.mutate(
-            // undefined
-            { id: gameId, context: { 
-              players:  Array.from({ length: nPlayers }, (_, i) => String.fromCharCode(97 + i)),
-              cardsPerPlayer: nCards
-            } }
+            {
+              id: gameId, context: {
+                // players: Object.keys(lobbyData.data?.players??{}),
+                players: Array.from({ length: nPlayers }, (_, i) => String.fromCharCode(97 + i)),
+                cardsPerPlayer: nCards
+              }
+            }
           )}
-        > 
-          Create Game 
+        >
+          Create Game
         </button>
       </div>
-     
     </div>
   )
 }
@@ -343,7 +394,7 @@ export function GameScreen() {
         <h2 className="text-lg">Game Instance: {gameId}
           <QueryStatus name="gamedoc" res={gameDocument} />
         </h2>
-        <h2 className='text-lg'>Player: {user.data?.uid || <Link to="/signin" state={{from: location}}>unknown. (signin?)</Link>}
+        <h2 className='text-lg'>Player: {user.data?.uid || <Link to="/signin" state={{ from: location }}>unknown. (signin?)</Link>}
           <QueryStatus name="gamedoc" res={user} />
         </h2>
       </nav>
@@ -352,7 +403,7 @@ export function GameScreen() {
         {gameDocument.isLoading && <h1>Loading...</h1>}
 
         {gameDocument.isSuccess && playerExists && !gameDocument.data?.exists() && (
-          <Lobby gameId={gameId} playerId={user.data?.uid}/>
+          <Lobby gameId={gameId} playerId={user.data?.uid} />
         )}
 
         {gameDocument.isSuccess && playerExists && gameDocument.data?.exists() && (
