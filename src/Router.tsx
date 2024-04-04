@@ -29,13 +29,9 @@ export const router = createBrowserRouter(createRoutesFromElements(
   <Route path="/" element={<Layout />}>
     <Route index element={<HomePage />}/>
 
-    {/* OLD ROUTES */}
+    {/* Old janky single page game */}
     <Route element={<LoggedInRoute />}>
-      <Route path="/old" element={<Navigate to="/" replace />}/>
-      <Route element={<PlayerInGameRoute />}>
-        <Route path="/old/:gameId" element={<OldGamePage />} />
-      </Route>
-      <Route path="/l/:gameId?" element={<OldGamePage />} />
+      <Route path="/old/:gameId?" element={<OldGamePage />} />
     </Route>
 
 
