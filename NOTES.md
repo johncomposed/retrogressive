@@ -13,6 +13,10 @@ https://firebase.google.com/docs/functions/local-shell
 See also https://medium.com/@moki298/test-your-firebase-cloud-functions-locally-using-cloud-functions-shell-32c821f8a5ce
 
 
+To filter out chrome extension logs in the chrome console use
+`-chrome-extension -url:chrome-extension`
+
+
 ```
 runGame({data: {id: '2', context: {players: ['a', 'b'], cardsPerPlayer:3}, event: {type: 'START_GAME'}}}) 
 
@@ -23,3 +27,12 @@ runGame({data: {id: '2', context: {players: ['a', 'b'], cardsPerPlayer:3}, event
 
 Note on persistance: xstate 5 has a whole other setup for it. https://stately.ai/docs/persistence. Which doesn't have the context or anything but generally seems to make stuff easier. TODO on update to xstate5 
 
+```
+npm run dev
+npm run emulate
+cd functions && npm run build:watch
+```
+
+export type FunctionsErrorCode = "ok" | "cancelled" | "unknown" | "invalid-argument" | "deadline-exceeded" | "not-found" | "already-exists" | "permission-denied" | "resource-exhausted" | "failed-precondition" | "aborted" | "out-of-range" | "unimplemented" | "internal" | "unavailable" | "data-loss" | "unauthenticated";
+
+https://stackoverflow.com/questions/67781589/how-to-setup-a-firebase-demo-project

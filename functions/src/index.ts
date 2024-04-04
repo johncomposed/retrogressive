@@ -1,205 +1,181 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/https";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {initializeApp} from "firebase-admin/app"
+import {getFirestore, Timestamp, DocumentReference} from "firebase-admin/firestore"
+import { getAuth } from 'firebase-admin/auth';
 
-import {onRequest, onCall} from "firebase-functions/v2/https";
-import * as logger from "firebase-functions/logger";
+// import {getDatabase,} from "firebase-admin/database"
+// import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions";
 // import {onValueCreated} from "firebase-functions/v2/database"
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+// import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import { Event } from "xstate";
 
-import {initializeApp} from "firebase-admin/app"
-import {getFirestore, FieldValue, Timestamp} from "firebase-admin/firestore"
-
-import {getDatabase,} from "firebase-admin/database"
-
+import { GameDoc, getGamePlayerData, runGameTransition } from "./GameUtils";
+import { GAME_COLLECTION, gameDocPath, playerDocPath, GamePlayerDoc, omit } from "./shared";
 import { hello } from "./shared/hello";
-
-
-import { gameMachine, GameContext, GameEvent, initGameContext } from "./shared/retroMachine/machine";
-import { interpret, Event, State } from "xstate";
-// import { database } from "firebase-admin";
+import { gameMachine, GameContext, GameEvent, initGameContext, PlayerId } from "./shared/retroMachine/machine";
 
 
 initializeApp();
-type RetroGameState = State<GameContext, GameEvent, any, any, any>
+console.log('Shared directory still works:', hello())
 
-type WithoutFn<T> = {
-  [K in keyof T]: T[K] extends Function ? never : K
-}[keyof T];
-
-type PropsWithoutFn<T> = Pick<T, WithoutFn<T>>;
-
-
-export type Serializable<T> = PropsWithoutFn<T> & {
-  [P in keyof PropsWithoutFn<T>]: T[P] extends object ? Serializable<T[P]> : T[P];
-};
-
-console.log('MAYBE', hello())
-
-/**
- * If I want more complicated storage of game state (including a growing history stack that i'll have to clean up eventually)
- * type GameStorage = Serializable<RetroGameState['toJSON']>
- * const serializeState = (state: RetroGameState): GameStorage => JSON.parse(JSON.stringify(state.toJSON()))
- * const toState = (state: GameStorage): RetroGameState => state;
- */
+export const userCreated = functions.auth.user().onCreate((user) => {
+  const db = getFirestore();
+  // Add a new document in Firestore for the newly created user
+  return db.doc(`/users/${user.uid}`).set({
+    avatar: '👤',
+    displayName: user.displayName || 'Anonymous',
+    createdAt: new Date(), 
+  });
+});
 
 
-type GameMeta = {
-  created: Timestamp
-  // events: GameEvent[]
+export const updateUserInAuth = functions.firestore.document('/users/{userId}').onUpdate(async (change, context) => {
+  const beforeData = change.before.data();
+  const afterData = change.after.data();
+  const auth = getAuth();
+  let success = true;
+  // Syncing the displayname and the user data. Just cause it feels bad to not do it.
+  if (beforeData.displayName !== afterData.displayName) {
+    try {
+      await auth.updateUser(context.params.userId, {
+        displayName: afterData.displayName,
+      });
+    } catch (error) {
+      console.error('Error updating user in Auth:', error);
+      success = false;
+      // TODO: What does this do? I don't know enough about firebase internals here.
+      // throw new functions.https.HttpsError('internal', 'Unable to update user displayName in Auth');
+    }
+  }
+
+  return success
+});
+
+
+type CreateGame = {
+  id: string
+  context?: Partial<GameContext> & {
+    players: GameContext['players'];
+    cardsPerPlayer?: GameContext['cardsPerPlayer']
+  }
 }
+export const createGame = onCall<CreateGame>(async (req) => {
+  const {data: {id, context}} = req;
 
-type GameStorage = {
-  state: RetroGameState['value'],
-  context: GameContext,
-  lastUpdated: Timestamp,
-} & Partial<GameMeta> // TODO: being lazy with types.
+  if (!id || !context) {
+    throw new HttpsError('invalid-argument', 'Send id and context');
+  }
 
+  if (!context.players || !context.players.length) {
+    throw new HttpsError('invalid-argument', 'Context needs players');
+  }
 
-const serializeState = (state: RetroGameState): GameStorage => ({
-  // TODO: I'd like to save the latest event and append it to a list of events. Including ones that didn't result in a change. 
-  state: state.value,
-  context: state.context,
-  lastUpdated: Timestamp.now()
-})
+  const gameDocRef = getFirestore()
+    .collection(GAME_COLLECTION)
+    .doc(id) as DocumentReference<GameDoc>;
 
-const toState = ({state, context}: GameStorage): RetroGameState => State.from(state,context)
+  const gameDoc = await gameDocRef.get();
 
-const runGameTransition = async (loadedState: GameStorage, event: Event<GameEvent>) => {
-  // console.log('STATE', gameMachine.initialState)
-  // Create an instance of the machine
-  const service = interpret(gameMachine);
+  if (gameDoc.exists) {
+    throw new HttpsError('already-exists', 'Game already exists, dummy');
+  }
 
-  service.onTransition((state) => {
-    console.log('TRANSITION', state.changed, state.value
-    //, state.context
-    );
+  const initGameDoc = {
+    state: gameMachine.initialState.value,
+    players: context.players,
+    context: omit(initGameContext(context), 'hands', 'players'),
+    created: Timestamp.now(),
+    lastUpdated: Timestamp.now(),
+  }
+
+  console.log('init game doc', initGameDoc)
+  const batch = getFirestore().batch();
+
+  batch.set(gameDocRef, initGameDoc);
+
+  // Make the player private docs
+  context.players.forEach(playerId => {
+    const playerGameRef = getFirestore()
+      .doc(playerDocPath(id, playerId)) as DocumentReference<GamePlayerDoc>
+    batch.set(playerGameRef, { hands: [] });
   });
 
+  await batch.commit();
 
-  console.log('STARTING', service.getSnapshot().changed)
-  service.start(toState(loadedState)); // Set the start state
-
-  console.log('STARTED', service.getSnapshot().changed)
-  service.send(event);
-  console.log('SENT', service.getSnapshot().changed)
-
-  const newGameState = service.getSnapshot()
-  service.stop();
-  // const snap2 = serializeState(service.getSnapshot())
+  return { status: 'success', data: initGameDoc}
+})
 
 
-  console.log('STOPPED', service.getSnapshot().changed, newGameState.changed)
-  return newGameState as RetroGameState
-};
 
 type RunGame = {
   id: string
-  event?: Event<GameEvent>
-  context?: Partial<GameContext>
+  event: Event<GameEvent>
 }
 
-export const runGame = onCall<RunGame>(async (stuff) => {
-  const {data: {id, event, context: initContext }} = stuff
-  console.log('runGame', id, event, initContext)
-  if (!id) return {err: 'no id'};
+// TODO: handle player auth ids
+export const runGame = onCall<RunGame>(async (req) => {
+  const {data: {id, event}} = req;
+  console.log('runGame', id, event)
 
-  const gameDoc = await getFirestore()
-        .collection("games")
-        .doc(id);
+  if (!id || !event) {
+    throw new HttpsError('invalid-argument', 'Send id and event');
+  }
 
-  const gameDocData = await gameDoc.get();
+  const gameDocRef = await getFirestore()
+    .collection(GAME_COLLECTION)
+    .doc(id) as DocumentReference<GameDoc>;
 
-  const gameState = gameDocData.exists ? gameDocData.data() as GameStorage : {
-    ...serializeState(gameMachine.initialState),
-    context: initGameContext(initContext)
-  };
+  const gameDoc = await gameDocRef.get();
+  const gameDocData = await gameDoc.data();
 
-  // logger.info(gameState, {structuredData: true});
+  if (!gameDoc.exists || !gameDocData) {
+    throw new HttpsError('not-found', 'Game not found');
+  }
 
-  const newStateSnapshot = await runGameTransition(gameState, event || 'START_GAME')
+  const state = gameDocData.state;
+  const gamePlayerData = await getGamePlayerData(id);
+
+  const context = {
+    ...gameDocData.context,
+    players: gameDocData.players,
+    ...gamePlayerData,
+  }
+
+  const newStateSnapshot = await runGameTransition({state, context}, event)
 
   if (newStateSnapshot.changed) {
     console.log('state changed')
-    const newStateDoc = serializeState(newStateSnapshot)
-    const newWriteResult = await gameDocData.exists ? gameDoc.update(newStateDoc) : gameDoc.set({
-      ...newStateDoc,
-      created: Timestamp.now()
+    const { players, hands } = newStateSnapshot.context
+    const newParsedContext = omit(newStateSnapshot.context, 'hands', 'players');
+    const newState = newStateSnapshot.value;
+    const stateChangeBatch = getFirestore().batch();
+
+    // Check if hands changed. 
+    const newPlayerHands = Object.keys(hands);
+    newPlayerHands.forEach(playerId => {
+      if (hands[playerId]?.length !== context.hands[playerId]?.length) {
+        console.log('player hand changed:', playerId);
+        const playerGameRef = getFirestore().doc(playerDocPath(id, playerId)) as DocumentReference<GamePlayerDoc>
+        stateChangeBatch.set(playerGameRef, { hands: hands[playerId] });
+      }
     });
-    return newStateDoc
+
+    const newWriteResult = await stateChangeBatch.update(gameDocRef, {
+      context: newParsedContext,
+      state: newState,
+      players,
+      lastUpdated: Timestamp.now()
+    })
+
+    await stateChangeBatch.commit();
+    return { status: 'success', data: {changed: true, state: newState, context: newParsedContext}}
   }
 
-  console.log(`State hasn't changed`)  
-  return gameState
+  console.log(`State hasn't changed`);
+  // TODO: doesn't really make sense for it to say success here.
+  return { status: 'success', data: {changed: false, state: state, context: gameDocData.context}}
 });
 
 
-export const helloWorld = onRequest((request, response) => {
-  logger.info("Hello logs!", {structuredData: true});
-  // response.send({status: 'success', data:{ho:'whatever?'}})
-  response.json({msg: "Hello from Firebase!", data: {hi: "?"}});
-});
-
-export const helloWorldCall = onCall((data) => {
-  logger.info("Hello call!", {structuredData: true});
-  return {msg: "Hello from Firebase!", data: {hi: "?"}}
-});
-
-
-export const addmessage = onRequest(async (req, res) => {
-  logger.info("msg: ", req.query, req.method, req.params, req.path, req.originalUrl, {structuredData: true});
-
-  try {
-    const original = req.query.text;
-    // Push the new message into Firestore using the Firebase Admin SDK.
-    const writeResult = await getFirestore()
-        .collection("messages")
-        .add({original: original});
-    // Send back a message that we've successfully written the message
-    res.json({result: `Message with ID: ${writeResult.id} added.`});
-
-  } catch(e) {
-
-    res.status(500).json({error: e})
-  }
-
-});
-
-export const makeUppercase = onDocumentCreated("/messages/{documentId}", (event) => {
-  if (!event.data) return;
-
-  // Grab the current value of what was written to Firestore.
-  const original = event.data.data().original;
-
-  // Access the parameter `{documentId}` with `event.params`
-  logger.log("Uppercasing", event.params.documentId, original);
-
-  const uppercase = original.toUpperCase();
-
-  // You must return a Promise when performing
-  // asynchronous tasks inside a function
-  // such as writing to Firestore.
-  // Setting an 'uppercase' field in Firestore document returns a Promise.
-  return event.data.ref.set({uppercase}, {merge: true});
-})
-
-
-export const smileyGenerator = functions.database.ref('/smile/{smileyId}/count').onCreate(async (snapshot, context) => {
-  let count = snapshot.val()
-  let smiles = '😊';
-  while (count > 1) {
-     smiles = smiles + '😊'
-     count--
-  }
-
-  const setResult = await snapshot.ref.parent!.child('smileys').set(smiles)
-
-  return {data: smiles}
-})
-
+export * from './exampleFns'

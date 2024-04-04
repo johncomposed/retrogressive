@@ -1,3 +1,5 @@
+import type { State } from "xstate";
+
 export type PlayerId = string;
 export type LooseCard = string;
 
@@ -36,6 +38,7 @@ export interface GameContext extends RoundContext {
   currentPlayerIndex: number;
 }
 
+export type GenericGameState = State<GameContext, GameEvent, any, any, any>
 
 export type BidEvent =
   | { type: "MAKE_BID"; playerId: PlayerId; bid: number }

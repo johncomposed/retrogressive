@@ -1,6 +1,6 @@
 import { GuardPredicate, ConditionPredicate } from "xstate";
 import {GameContext, GameEvent} from './types'
-import {isBidValid} from './utils'
+import {isBidValid, isPlayValid} from './utils'
 
 
 
@@ -15,8 +15,6 @@ const guard = (fn: (context: GameContext, e: GameEvent, meta: any) => boolean) =
     return result;
   }) as any as ConditionPredicate<GameContext, GameEvent>
 }
-  // fn as any as ConditionPredicate<GameContext, GameEvent>
-
 
 export const isValidBid = guard((context, event) => {
   if (event.type !== "MAKE_BID") return false;
@@ -25,11 +23,13 @@ export const isValidBid = guard((context, event) => {
   if (event.playerId !== currentPlayerId) return false;
 
   return isBidValid({
-    roundNumber: context.roundNumber,
-    cardsPerPlayer: context.cardsPerPlayer,
-    players: context.players,
-    bids: context.bids
-  }, event);
+      roundNumber: context.roundNumber,
+      cardsPerPlayer: context.cardsPerPlayer,
+      bids: context.bids
+    },  
+    context.players,
+    event.bid
+  );
 })
 
 export const isBiddingComplete = guard((context) => {
@@ -40,25 +40,13 @@ export const isBiddingComplete = guard((context) => {
 
 export const isValidPlay = guard((context, event) => {
   if (event.type !== 'PLAY_CARD') return false;
+
+  // Only the current player can play.
   const currentPlayerId = context.players[context.currentPlayerIndex];
+  if (event.playerId !== currentPlayerId) return false;
+
   const playerHand = context.hands[currentPlayerId];
-  const cardSuit = event.card.slice(0, 1);
-
-  // Check if the player is the current player and if the card is in their hand
-  const isCurrentPlayer = event.playerId === currentPlayerId;
-  const hasCard = playerHand.includes(event.card);
-
-  // If there's no lead suit, any card is valid
-  if (context.leadSuit === null) {
-    return isCurrentPlayer && hasCard;
-  }
-
-  // If the player has a card of the lead suit, they must play it
-  const hasLeadSuit = playerHand.some(
-    (card) => card.slice(0, 1) === context.leadSuit
-  );
-  const isFollowingSuit = cardSuit === context.leadSuit;
-  return isCurrentPlayer && hasCard && (!hasLeadSuit || isFollowingSuit);
+  return isPlayValid(event.card, playerHand, context.leadSuit)
 })
 
 export const isTrickComplete = guard((context) => {

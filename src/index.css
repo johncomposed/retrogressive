@@ -15,3 +15,21 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+
+
+.brutal {
+  @apply border-solid border-2 border-b-4 border-r-4 border-black;
+}
+
+.brutal:hover {
+  @apply border-2 border-solid border-b-4 border-r-4 border-black;
+}
+
+.brutal:active {
+  @apply border-2 border-solid border-b-2 border-r-2 border-black;
+}
+
+input.brutal:focus {
+  @apply border-2 border-solid border-b-2 border-r-2 border-black;
+}

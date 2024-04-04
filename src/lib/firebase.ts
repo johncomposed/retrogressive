@@ -8,23 +8,56 @@ import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
 
 let firebaseApp: FirebaseApp;
-const useEmulator = () => import.meta.env.VITE_USE_FIREBASE_EMULATOR;
+export const useEmulator = () => (import.meta.env.VITE_USE_FIREBASE_EMULATOR || '').trim().toLowerCase() === 'true';
 
 export const setupFirebase = () => {
   try {
-    firebaseApp = initializeApp({
-      apiKey: import.meta.env.VITE_FIREBASE_APIKEY,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTHDOMAIN,
-      databaseURL: import.meta.env.VITE_FIREBASE_DATABASEURL,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECTID,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGEBUCKET,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGINGSENDERID,
-      appId: import.meta.env.VITE_FIREBASE_APPID,
-    });
+    const env = import.meta.env;
+    const firebaseConfig = {
+      apiKey: env.VITE_FIREBASE_APIKEY,
+      authDomain: env.VITE_FIREBASE_AUTHDOMAIN,
+      databaseURL: env.VITE_FIREBASE_DATABASEURL,
+      projectId: env.VITE_FIREBASE_PROJECTID,
+      storageBucket: env.VITE_FIREBASE_STORAGEBUCKET,
+      messagingSenderId: env.VITE_FIREBASE_MESSAGINGSENDERID,
+      appId: env.VITE_FIREBASE_APPID,
+    }
+
+    firebaseApp = initializeApp(
+      firebaseConfig.projectId.startsWith('demo-') ? 
+        Object.keys(firebaseConfig).reduce((prev, k) => {
+          prev[k] = k === 'projectId' ? firebaseConfig[k] : 'example_dummy_apikey';
+          return prev;
+        }, {}) : 
+      firebaseConfig
+    );
   } catch (error) {
     console.error({error})
+    return false;
   }
+
+  return firebaseApp;
 };
+
+export const defaultEmHost = 'localhost'
+export const emulatorConfig = {
+  "auth": {
+    "host": "127.0.0.1",
+    "port": 9099
+  },
+  "functions": {
+    "port": 5001
+  },
+  "firestore": {
+    "port": 8080
+  },
+  "database": {
+    "port": 9000
+  },
+  "hosting": {
+    "port": 5000
+  },
+}
 
 let auth: Auth;
 let firestore: ReturnType<typeof getFirestore>;
@@ -32,10 +65,17 @@ let firestore: ReturnType<typeof getFirestore>;
 let database: ReturnType<typeof getDatabase>
 let functions: ReturnType<typeof getFunctions>
 
+
 export const useAuth = () => {
-  auth = getAuth(firebaseApp);
-  if (useEmulator()) {
-    connectAuthEmulator(auth, 'http://localhost:9099');
+
+  if (!auth) {
+    if (useEmulator()) {
+      auth = getAuth(firebaseApp);
+      connectAuthEmulator(auth, `http://${emulatorConfig.auth.host || defaultEmHost}:${emulatorConfig.auth.port}`, {disableWarnings: false});
+    } else {
+      auth = getAuth(firebaseApp);
+    }
+    
   }
   return auth;
 };
@@ -44,19 +84,17 @@ export const useFirestore = () => {
   if (!firestore) {
     firestore = getFirestore();
     if (useEmulator()) {
-      connectFirestoreEmulator(firestore, 'localhost', 8080);
+      connectFirestoreEmulator(firestore, defaultEmHost, emulatorConfig.firestore.port);
     }
   }
   return firestore;
 };
 
 export const useFunctions = () => {
-  console.log('EMULATE?', useEmulator())
-
-  if (!firestore) {
+  if (!functions) {
     functions = getFunctions();
     if (useEmulator()) {
-      connectFunctionsEmulator(functions, 'localhost', 5001);
+      connectFunctionsEmulator(functions, defaultEmHost, emulatorConfig.functions.port);
     }
   }
   return functions;
@@ -76,10 +114,9 @@ export const useDatabase = () => {
   if (!database) {
     database = getDatabase();
     if (useEmulator()) {
-      connectDatabaseEmulator(database, 'localhost', 9000);
+      connectDatabaseEmulator(database, defaultEmHost, emulatorConfig.database.port);
     }
   }
   return database;
 };
-
 

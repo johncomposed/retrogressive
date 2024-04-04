@@ -1,6 +1,23 @@
-# ⚡ vite-react-ts-tailwind-starter
+# Retrogressive
 
-Starter using Vite + React + TypeScript + Tailwind with Firebase.
+# TODOS
+## General Flow
+- Should I make the state after a round wait for an event? 
+  - Maybe I could reuse a voting system for dealing the next hand. 
+  - Otherwise I have to figure out some way of making it a smoother transition to the next hand on the client.
+
+## Lobby
+- Edit machine to allow voting to start
+
+## UI
+- Rough layout
+- Edge states
+- Animations
+- Tighter UI fixes
+
+
+
+
 
 ## Motivation
 

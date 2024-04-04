@@ -1,6 +1,6 @@
 import { assign as _assign} from "xstate";
 import {GameContext, GameEvent, CardSuit} from './types'
-import {createShuffledDeck, dealCards, isBidValidOpts, isBidValid, calculateRoundPoints } from './utils'
+import {createShuffledDeck, dealCards, isBidValidOpts, isBidValid, calculateRoundPoints, scoreTrick } from './utils'
 
 
 // type _Assign = typeof _assign
@@ -60,21 +60,7 @@ export const playCard = assign((context, event) => {
 })
 
 export const scoreAndResetTrick = assign((context, event) => {
-  const winnerId = Object.entries(context.currentTrick).sort(
-    ([a, av], [b, bv]) => {
-      if (!av || !bv) return 0;
-
-      const led = context.leadSuit;
-      const trumps = context.trumpCard[0];
-
-      const aN = parseInt(av.slice(1), 10) +
-        (av[0] === led ? 100 : av[0] === trumps ? 200 : 0);
-      const bN = parseInt(bv.slice(1), 10) +
-        (bv[0] === led ? 100 : bv[0] === trumps ? 200 : 0);
-
-      return bN - aN;
-    }
-  )[0][0];
+  const winnerId = scoreTrick(context)
 
   return {
     currentTrick: {},
@@ -109,7 +95,8 @@ export const updateRound = assign((context, event) => {
     // TODO: don't love this init here. But unclear if it should go in dealing or what.
     currentTrick: {},
     trickWinners: [],
-    leadSuit: null
+    leadSuit: null,
+    bids: {},
   };
 })
 

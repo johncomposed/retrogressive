@@ -1,16 +1,9 @@
-import {PlayerId, RoundContext, RoundPoints, GameContext, BidEvent, PlayEvent, RoundEvent, GameEvent, StrictCard} from './types'
+import {PlayerId, RoundContext, RoundPoints, GameContext, BidEvent, PlayEvent, RoundEvent, GameEvent, StrictCard, CardSuit} from './types'
 
 export type HasProps<T> = T & {
   [P in keyof T]: T[P] extends object ? HasProps<T[P]> : T[P];
 };
 
-
-// export const getInitialRoundContext = (roundContext: Partial<RoundContext> = {}): RoundContext => {
-//   return {
-//     ...roundContext
-//   }
-
-// }
 
 export function isStrictCard(str: string): str is StrictCard {
   if (!str || str.length < 2) return false;
@@ -47,27 +40,70 @@ export function dealCards(deck: StrictCard[], cardsPerHand: number, playerIds: P
 export type isBidValidOpts = {
   roundNumber: number;
   cardsPerPlayer: number;
-  players: PlayerId[];
   bids: Record<PlayerId, number>; 
 }
-export function isBidValid(opts: isBidValidOpts, event: { playerId: PlayerId; bid: number }) {
-  const {roundNumber, cardsPerPlayer, players, bids} = opts;
+export function isBidValid(opts: isBidValidOpts, players: PlayerId[],  bid: number) {
+  const {roundNumber, cardsPerPlayer, bids} = opts;
 
   // Can't bid more than current cards per player
-  if (event.bid > cardsPerPlayer) return false;
+  if (bid > cardsPerPlayer) return false;
 
-  // If the last person to bid (dealer) is restricted 
-  // (e.g. it's not the last round and/or it hasn't gone around or whatever the rules are)
-  const restrictDealerBid = roundNumber < players.length || cardsPerPlayer > 1;
+  // If the last person to bid is restricted.
+  // Last bidder is unrestricted during the last round or once everyone has been last bidder once.
+  const restrictLastBidder = roundNumber < players.length || cardsPerPlayer > 1;
   const bidArray = Object.values(bids).filter((b) => b !== undefined);
 
-  if (restrictDealerBid && (players.length - bidArray.length) <= 1) {
+  if (restrictLastBidder && (players.length - bidArray.length) <= 1) {
     // Then the dealer can't bid an amount that makes it theoretically possible for everyone to make their bid.
-    return cardsPerPlayer !== (bidArray.reduce((b, acc) => b + acc, 0) + event.bid);
+    return cardsPerPlayer !== (bidArray.reduce((b, acc) => b + acc, 0) + bid);
   }
 
   return true;
 }
+
+
+export function isPlayValid(card: StrictCard, playerHand: StrictCard[], leadSuit: CardSuit|null) {
+  // Is it a valid card?
+  if (!isStrictCard(card)) return false;
+
+  // Is the card is in their hand
+  const hasCard = playerHand.includes(card);
+  if (!hasCard) return false;
+
+  // If there's no lead suit, any of their cards are valid
+  if (leadSuit === null) return true;
+
+  // If they player doesn't have any cards in the lead suit, anything goes.
+  const hasLeadSuit = playerHand.some((card) => card.slice(0, 1) === leadSuit);
+  if (!hasLeadSuit) return true;
+
+    // If the player has a card of the lead suit, no other suits can be played.
+  const cardSuit = card.slice(0, 1);
+  const isFollowingSuit = cardSuit === leadSuit;
+  return isFollowingSuit;
+}
+
+
+export function scoreTrick(context: Pick<GameContext, 'trumpCard'|'leadSuit'|'currentTrick'>) {
+  const winnerId = Object.entries(context.currentTrick).sort(
+    ([a, av], [b, bv]) => {
+      if (!av || !bv) return 0;
+
+      const led = context.leadSuit;
+      const trumps = context.trumpCard[0];
+
+      const aN = parseInt(av.slice(1), 10) +
+        (av[0] === led ? 100 : av[0] === trumps ? 200 : 0);
+      const bN = parseInt(bv.slice(1), 10) +
+        (bv[0] === led ? 100 : bv[0] === trumps ? 200 : 0);
+
+      return bN - aN;
+    }
+  )[0][0];
+
+  return winnerId as PlayerId
+}
+
 
 export function calculateRoundPoints({bids, trickWinners}: RoundPoints, scores: Record<PlayerId, number> = {}) {
   const points = { ...scores };
